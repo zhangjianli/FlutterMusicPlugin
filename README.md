@@ -2,7 +2,7 @@
 
 A Flutter Music plugin. Just for leaning flutter plugin development. And it's Android only.
 
-# What can this plugin do
+## What can this plugin do
 
 > Open and play local audio files from Flutter App using Android's Native `MediaPlayer`.
 
@@ -12,7 +12,7 @@ A Flutter Music plugin. Just for leaning flutter plugin development. And it's An
 
 > More to comming...
 
-# Key Points
+## Key Points
 
 > Communication between Flutter App via `MethodChannel`.
 
