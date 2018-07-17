@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'package:flutter_music_plugin/flutter_music_plugin.dart';
+import 'visualizer.dart';
 
-void main() => runApp(new MyApp());
+void main() => runApp(MyApp());
 
 class MyApp extends StatefulWidget {
   @override
-  _MyAppState createState() => new _MyAppState();
+  _MyAppState createState() => _MyAppState();
 }
 
 class _MyAppState extends State<MyApp> {
@@ -30,11 +31,13 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          mainAxisAlignment: MainAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Center(
                 child: Text(_status.toUpperCase(),
                     style: TextStyle(fontSize: 32.0))),
+            Expanded(child: Visualizer()),
             Center(
                 child: Text(
                     _position.toString().split('.').first +
