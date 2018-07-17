@@ -1,9 +1,13 @@
 package io.github.zhangjianli.fluttermusicplugin;
 
+import android.Manifest;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.media.audiofx.Visualizer;
 import android.net.Uri;
 import android.os.Handler;
 import android.util.Log;
@@ -22,7 +26,7 @@ import static android.app.Activity.RESULT_OK;
 /**
  * FlutterMusicPlugin
  */
-public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.ViewDestroyListener, PluginRegistry.ActivityResultListener {
+public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.ViewDestroyListener, PluginRegistry.ActivityResultListener, PluginRegistry.RequestPermissionsResultListener {
 
     private static final String TAG = FlutterMusicPlugin.class.getSimpleName();
 
@@ -30,6 +34,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
     private static final String PLAYER_EVENT_STATUS_CHANNEL_NAME = "flutter_music_plugin.event.status";
     private static final String PLAYER_EVENT_POSITION_CHANNEL_NAME = "flutter_music_plugin.event.position";
     private static final String PLAYER_EVENT_SPECTRUM_CHANNEL_NAME = "flutter_music_plugin.event.spectrum";
+    private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1001;
 
     private static final int REQUEST_CODE_OPEN = 12345;
 
@@ -46,6 +51,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
     };
 
     private MediaPlayer mMediaPlayer;
+    private Visualizer mVisualizer;
 
     private Activity mActivity;
 
@@ -55,6 +61,10 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
 
     private FlutterMusicPlugin(Activity activity) {
         mActivity = activity;
+        if (mActivity.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            // Permission is not granted
+            mActivity.requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, PERMISSIONS_REQUEST_RECORD_AUDIO);
+        }
     }
 
     /**
@@ -64,6 +74,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
         final FlutterMusicPlugin plugin = new FlutterMusicPlugin(registrar.activity());
         registrar.addViewDestroyListener(plugin);
         registrar.addActivityResultListener(plugin);
+        registrar.addRequestPermissionsResultListener(plugin);
         final MethodChannel channel = new MethodChannel(registrar.messenger(), METHOD_CHANNEL_NAME);
         channel.setMethodCallHandler(plugin);
         EventChannel status_channel = new EventChannel(registrar.messenger(), PLAYER_EVENT_STATUS_CHANNEL_NAME);
@@ -110,11 +121,13 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
         switch (call.method) {
             case "pause":
                 mMediaPlayer.pause();
+                mVisualizer.setEnabled(false);
                 mHandler.removeCallbacks(mPositionReporter);
                 mStateSink.success("paused");
                 break;
             case "start":
                 mMediaPlayer.start();
+                mVisualizer.setEnabled(true);
                 mStateSink.success("started");
                 mHandler.postDelayed(mPositionReporter, 500);
                 break;
@@ -160,6 +173,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
 
     private void stop() {
         if (mMediaPlayer != null) {
+            mVisualizer.release();
             mHandler.removeCallbacks(mPositionReporter);
             mMediaPlayer.stop();
             mMediaPlayer.release();
@@ -176,6 +190,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
             mMediaPlayer.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
                 @Override
                 public void onCompletion(MediaPlayer mp) {
+                    mVisualizer.setEnabled(false);
                     mStateSink.success("completed");
                     mHandler.removeCallbacks(mPositionReporter);
                 }
@@ -191,6 +206,31 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
             try {
                 mMediaPlayer.setDataSource(mActivity, uri);
                 mMediaPlayer.prepare();
+                mVisualizer = new Visualizer(mMediaPlayer.getAudioSessionId());
+                mVisualizer.setCaptureSize(Visualizer.getCaptureSizeRange()[0]);
+                mVisualizer.setDataCaptureListener(new Visualizer.OnDataCaptureListener() {
+                    public void onWaveFormDataCapture(Visualizer visualizer, byte[] bytes, int samplingRate) {}
+
+                    public void onFftDataCapture(Visualizer visualizer, byte[] bytes, int samplingRate) {
+                        //Log.d(TAG,"captrued length "+bytes.length);
+                        byte[] spectrum = new byte[bytes.length / 2 + 1];
+                        spectrum[0] = (byte) Math.abs(bytes[0]);
+                        spectrum[spectrum.length - 1] = (byte) Math.abs(bytes[1]);
+                        for (int i=1; i<spectrum.length - 1; i++) {
+                            Double d = (Math.hypot(bytes[2*i], bytes[2*i+1]));
+                            if (d<0) {
+                                spectrum[i] = 0;
+                            } else if (d>127) {
+                                spectrum[i] = 127 & 0xFF;
+                            } else {
+                                spectrum[i] = d.byteValue();
+                            }
+                        }
+                        mSpectrumSink.success(spectrum);
+                        //Log.d(TAG,"captrued: "+ spectrum[0]+" "+spectrum[1]+" "+spectrum[2]);
+                    }
+                }, Visualizer.getMaxCaptureRate() / 2, false, true);
+                mVisualizer.setEnabled(true);
                 mMediaPlayer.start();
                 mStateSink.success("started");
                 mHandler.postDelayed(mPositionReporter, 500);
@@ -212,5 +252,20 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
 
     public void setSpectrumSink(EventChannel.EventSink spectrumSink) {
         mSpectrumSink = spectrumSink;
+    }
+
+    @Override
+    public boolean onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case PERMISSIONS_REQUEST_RECORD_AUDIO :
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    return true;
+                } else {
+                    mActivity.finish();
+                    return false;
+                }
+            default:
+                return  false;
+        }
     }
 }

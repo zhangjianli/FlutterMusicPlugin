@@ -34,7 +34,6 @@ class VisualizerState extends State<Visualizer> {
   }
 
   void _onSpectrum(Object event) {
-    print(event);
     setState(() {
       _spectrum = event;
     });
