@@ -213,23 +213,21 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
 
                     public void onFftDataCapture(Visualizer visualizer, byte[] bytes, int samplingRate) {
                         //Log.d(TAG,"captrued length "+bytes.length);
-                        byte[] spectrum = new byte[bytes.length / 2 + 1];
-                        spectrum[0] = (byte) Math.abs(bytes[0]);
-                        spectrum[spectrum.length - 1] = (byte) Math.abs(bytes[1]);
-                        for (int i=1; i<spectrum.length - 1; i++) {
-                            Double d = (Math.hypot(bytes[2*i], bytes[2*i+1]));
-                            if (d<0) {
+                        byte[] spectrum = new byte[bytes.length / 2];
+                        for (int i = 0; i < spectrum.length; i++) {
+                            Double magnitude = Math.hypot(bytes[2*i], bytes[2*i+1]);
+                            if (magnitude < 0) {
                                 spectrum[i] = 0;
-                            } else if (d>127) {
+                            } else if (magnitude > 127) {
                                 spectrum[i] = 127 & 0xFF;
                             } else {
-                                spectrum[i] = d.byteValue();
+                                spectrum[i] = magnitude.byteValue();
                             }
                         }
                         mSpectrumSink.success(spectrum);
                         //Log.d(TAG,"captrued: "+ spectrum[0]+" "+spectrum[1]+" "+spectrum[2]);
                     }
-                }, Visualizer.getMaxCaptureRate() / 2, false, true);
+                }, Visualizer.getMaxCaptureRate()/2, false, true);
                 mVisualizer.setEnabled(true);
                 mMediaPlayer.start();
                 mStateSink.success("started");

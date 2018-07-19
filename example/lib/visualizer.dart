@@ -3,7 +3,7 @@ import 'package:flutter_music_plugin/flutter_music_plugin.dart';
 
 import 'dart:typed_data';
 
-const COLUMNS_COUNT= 64;
+const COLUMNS_COUNT= 48;
 
 class Visualizer extends StatefulWidget {
   @override
