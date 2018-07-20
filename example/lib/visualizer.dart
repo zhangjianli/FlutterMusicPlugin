@@ -24,7 +24,7 @@ class VisualizerState extends State<Visualizer> {
 
   @override
   Widget build(BuildContext context) {
-    return new CustomPaint(
+    return CustomPaint(
       painter: VisualizerPainter(_spectrum)
     );
   }
