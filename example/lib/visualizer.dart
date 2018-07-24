@@ -4,21 +4,27 @@ import 'package:flutter_music_plugin/flutter_music_plugin.dart';
 import 'dart:typed_data';
 
 const COLUMNS_COUNT= 48;
+const DURATION = const Duration(milliseconds: 200);
 
 class Visualizer extends StatefulWidget {
   @override
   VisualizerState createState() => VisualizerState();
 }
 
-class VisualizerState extends State<Visualizer> {
+class VisualizerState extends State<Visualizer> with SingleTickerProviderStateMixin {
 
   Uint8List _spectrum;
+
+  AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
     // connect to native channels
     FlutterMusicPlugin.listenSpectrum(_onSpectrum, _onSpectrumError);
+
+    _controller = AnimationController(duration: DURATION, vsync: this);
+    _controller.addListener(_onTick);
   }
 
 
@@ -35,8 +41,34 @@ class VisualizerState extends State<Visualizer> {
 
   void _onSpectrum(Object event) {
     setState(() {
-      _spectrum = event;
+      if (_spectrum == null) {
+        _spectrum = event;
+      } else {
+        if (event is Uint8List) {
+          for (int i = 0; i < COLUMNS_COUNT; i++) {
+            if (event[i] > _spectrum[i]) {
+              _spectrum[i] = event[i];
+            }
+          }
+        }
+      }
     });
+    _controller.forward(from: 0.0);
+  }
+
+  void _onTick() {
+    setState(() {
+     for (int i=0; i<COLUMNS_COUNT; i++) {
+         _spectrum[i] = (_spectrum[i] - 1).clamp(0, 127);
+     }
+
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 }
 
@@ -77,5 +109,5 @@ class VisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(VisualizerPainter oldDelegate) => oldDelegate._spectrum != _spectrum;
+  bool shouldRepaint(VisualizerPainter oldDelegate) => true;//oldDelegate._spectrum != _spectrum;
 }
