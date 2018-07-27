@@ -35,6 +35,7 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
     private static final String PLAYER_EVENT_POSITION_CHANNEL_NAME = "flutter_music_plugin.event.position";
     private static final String PLAYER_EVENT_SPECTRUM_CHANNEL_NAME = "flutter_music_plugin.event.spectrum";
     private static final int PERMISSIONS_REQUEST_RECORD_AUDIO = 1001;
+    private static final int PERMISSIONS_REQUEST_READ_STORAGE = 1002;
 
     private static final int REQUEST_CODE_OPEN = 12345;
 
@@ -173,7 +174,9 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
 
     private void stop() {
         if (mMediaPlayer != null) {
-            mVisualizer.release();
+            if (mVisualizer != null) {
+                mVisualizer.release();
+            }
             mHandler.removeCallbacks(mPositionReporter);
             mMediaPlayer.stop();
             mMediaPlayer.release();
@@ -257,6 +260,17 @@ public class FlutterMusicPlugin implements MethodCallHandler, PluginRegistry.Vie
     public boolean onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
         switch (requestCode) {
             case PERMISSIONS_REQUEST_RECORD_AUDIO :
+                if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                    if (mActivity.checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                        // Permission is not granted
+                        mActivity.requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE}, PERMISSIONS_REQUEST_READ_STORAGE);
+                    }
+                    return true;
+                } else {
+                    mActivity.finish();
+                    return false;
+                }
+            case PERMISSIONS_REQUEST_READ_STORAGE :
                 if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                     return true;
                 } else {
